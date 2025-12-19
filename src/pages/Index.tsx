@@ -59,11 +59,7 @@ const Index: React.FC = () => {
 
             {/* Right side */}
             <div className="flex items-center gap-3">
-              {/* Connection status indicator */}
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted text-xs text-muted-foreground">
-                <Wifi className="w-3 h-3" />
-                <span>Auto-sync enabled</span>
-              </div>
+             
 
               {/* Refresh button */}
               <Button

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Product } from '@/types/product';
-import { useUpdateProduct, useDeleteProduct } from '@/hooks/useProducts';
+import { useProduct, useUpdateProduct, useDeleteProduct } from '@/hooks/useProducts';
 import {
   Dialog,
   DialogContent,
@@ -22,17 +22,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Star, Edit2, Trash2, X, Loader2, Save } from 'lucide-react';
+import { Star, Edit2, Trash2, X, Loader2, Save, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProductDetailModalProps {
-  product: Product | null;
+  productId: number | null;
   isOpen: boolean;
   onClose: () => void;
 }
 
 const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
-  product,
+  productId,
   isOpen,
   onClose,
 }) => {
@@ -48,6 +48,22 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const { toast } = useToast();
   const updateMutation = useUpdateProduct();
   const deleteMutation = useDeleteProduct();
+  
+  // Fetch product details only when modal is open and productId is available
+  const { 
+    data: product, 
+    isLoading, 
+    isError,
+    error 
+  } = useProduct(productId || 0, isOpen && productId !== null);
+
+  // Reset editing state when modal opens with a new product
+  useEffect(() => {
+    if (isOpen) {
+      setIsEditing(false);
+      setEditForm({ title: '', price: '', description: '', category: '' });
+    }
+  }, [isOpen, productId]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -76,11 +92,42 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const handleSave = async () => {
     if (!product) return;
 
+    // Validate title
+    if (!editForm.title.trim()) {
+      toast({
+        title: 'Invalid title',
+        description: 'Please enter a product title',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate price
     const priceNum = parseFloat(editForm.price);
     if (isNaN(priceNum) || priceNum <= 0) {
       toast({
         title: 'Invalid price',
-        description: 'Please enter a valid price',
+        description: 'Please enter a valid price greater than 0',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate description
+    if (!editForm.description.trim()) {
+      toast({
+        title: 'Invalid description',
+        description: 'Please enter a product description',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate category
+    if (!editForm.category.trim()) {
+      toast({
+        title: 'Invalid category',
+        description: 'Please enter a product category',
         variant: 'destructive',
       });
       return;
@@ -90,10 +137,10 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       await updateMutation.mutateAsync({
         id: product.id,
         data: {
-          title: editForm.title,
+          title: editForm.title.trim(),
           price: priceNum,
-          description: editForm.description,
-          category: editForm.category,
+          description: editForm.description.trim(),
+          category: editForm.category.trim(),
         },
       });
 
@@ -115,13 +162,17 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     if (!product) return;
 
     try {
+      // Close both modals immediately for instant feedback
+      setShowDeleteConfirm(false);
+      onClose();
+      
+      // Execute deletion in background (optimistic update already removes from UI)
       await deleteMutation.mutateAsync(product.id);
+      
       toast({
         title: 'Product deleted',
         description: 'The product has been successfully removed.',
       });
-      setShowDeleteConfirm(false);
-      onClose();
     } catch (error) {
       toast({
         title: 'Delete failed',
@@ -137,16 +188,47 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     onClose();
   };
 
-  if (!product) return null;
+  // Don't render modal if productId is null
+  if (!isOpen || productId === null) {
+    return null;
+  }
 
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="sr-only">
-            <DialogTitle>{product.title}</DialogTitle>
+            <DialogTitle>{product?.title || 'Product Details'}</DialogTitle>
           </DialogHeader>
           
+          {/* Loading State */}
+          {(isLoading || !product) && !isError && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+              <p className="text-muted-foreground">Loading product details...</p>
+            </div>
+          )}
+
+          {/* Error State */}
+          {isError && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
+                <AlertCircle className="w-8 h-8 text-destructive" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                Failed to load product
+              </h3>
+              <p className="text-muted-foreground text-center max-w-md mb-4">
+                {error instanceof Error ? error.message : 'Could not fetch product details. Please try again.'}
+              </p>
+              <Button onClick={handleClose} variant="outline">
+                Close
+              </Button>
+            </div>
+          )}
+
+          {/* Product Content */}
+          {!isLoading && !isError && product && (
           <div className="grid md:grid-cols-2 gap-6">
             {/* Product Image */}
             <div className="aspect-square bg-muted/30 rounded-lg overflow-hidden">
@@ -277,6 +359,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               )}
             </div>
           </div>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -286,7 +369,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Product?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{product.title}"? This action cannot be undone.
+              Are you sure you want to delete "{product?.title || 'this product'}"? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

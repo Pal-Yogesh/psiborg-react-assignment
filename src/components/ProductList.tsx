@@ -22,7 +22,7 @@ interface ProductListProps {
   refetch: () => void;
 }
 
-const ITEMS_PER_PAGE = 8;
+const ITEMS_PER_PAGE = 10;
 
 const ProductList: React.FC<ProductListProps> = ({
   products,
@@ -34,7 +34,7 @@ const ProductList: React.FC<ProductListProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Filter products based on search and category
@@ -64,13 +64,13 @@ const ProductList: React.FC<ProductListProps> = ({
   }, [searchQuery, selectedCategory]);
 
   const handleProductClick = (product: Product) => {
-    setSelectedProduct(product);
+    setSelectedProductId(product.id);
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setSelectedProduct(null);
+    setSelectedProductId(null);
   };
 
   if (isError) {
@@ -200,7 +200,7 @@ const ProductList: React.FC<ProductListProps> = ({
 
       {/* Product Detail Modal */}
       <ProductDetailModal
-        product={selectedProduct}
+        productId={selectedProductId}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
       />

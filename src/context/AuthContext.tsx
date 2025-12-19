@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 interface AuthContextType {
   isLoggedIn: boolean;
   user: string | null;
+  loading: boolean;
   login: (username: string, password: string) => boolean;
   logout: () => void;
 }
@@ -14,15 +15,24 @@ const STORAGE_KEY = 'auth_session';
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check session storage on mount
-    const session = sessionStorage.getItem(STORAGE_KEY);
+    // Check localStorage on mount for persistent login
+    const session = localStorage.getItem(STORAGE_KEY);
     if (session) {
-      const { username } = JSON.parse(session);
-      setIsLoggedIn(true);
-      setUser(username);
+      try {
+        const { username, isLoggedIn: storedLoginStatus } = JSON.parse(session);
+        if (storedLoginStatus) {
+          setIsLoggedIn(true);
+          setUser(username);
+        }
+      } catch (error) {
+        // Clear invalid session data
+        localStorage.removeItem(STORAGE_KEY);
+      }
     }
+    setLoading(false);
   }, []);
 
   const login = (username: string, password: string): boolean => {
@@ -30,7 +40,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (username === 'user' && password === 'password') {
       setIsLoggedIn(true);
       setUser(username);
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ username }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ 
+        username, 
+        isLoggedIn: true,
+        timestamp: new Date().toISOString()
+      }));
       return true;
     }
     return false;
@@ -39,11 +53,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = () => {
     setIsLoggedIn(false);
     setUser(null);
-    sessionStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, user, login, logout }}>
+    <AuthContext.Provider value={{ isLoggedIn, user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

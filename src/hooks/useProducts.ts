@@ -61,17 +61,20 @@ export const useProducts = () => {
   return useQuery({
     queryKey: ['products'],
     queryFn: fetchProducts,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchOnWindowFocus: true, // Auto refresh on window focus
+    staleTime: 0, // Consider data immediately stale
+    refetchOnWindowFocus: 'always', // Always refresh on window focus
+    gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
   });
 };
 
-export const useProduct = (id: number) => {
+export const useProduct = (id: number, enabled: boolean = true) => {
   return useQuery({
     queryKey: ['product', id],
     queryFn: () => fetchProduct(id),
-    staleTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: true,
+    staleTime: 0, // Consider data immediately stale
+    refetchOnWindowFocus: 'always', // Always refresh on window focus
+    gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
+    enabled: enabled && id > 0, // Only fetch if enabled and id is valid
   });
 };
 
@@ -80,6 +83,8 @@ export const useCategories = () => {
     queryKey: ['categories'],
     queryFn: fetchCategories,
     staleTime: 1000 * 60 * 30, // 30 minutes - categories don't change often
+    refetchOnWindowFocus: true, // Refresh on focus only when stale
+    gcTime: 1000 * 60 * 60, // Keep in cache for 1 hour
   });
 };
 
@@ -123,11 +128,22 @@ export const useUpdateProduct = () => {
         queryClient.setQueryData(['product', id], context.previousProduct);
       }
     },
-    onSettled: (data, error, { id }) => {
-      // Invalidate to refetch
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['product', id] });
+    onSuccess: (data, { id }) => {
+      // On success, keep the updated data in cache
+      // Don't refetch - this ensures the changes persist in the UI
+      // Until the user manually refreshes the page
+      queryClient.setQueryData<Product[]>(['products'], (old) =>
+        old?.map((product) =>
+          product.id === id ? { ...product, ...data } : product
+        )
+      );
+      
+      queryClient.setQueryData<Product>(['product', id], (old) =>
+        old ? { ...old, ...data } : old
+      );
     },
+    // Removed onSettled to prevent automatic refetch
+    // This keeps the updated data in cache until user refreshes
   });
 };
 
@@ -139,6 +155,7 @@ export const useDeleteProduct = () => {
     onMutate: async (id) => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['products'] });
+      await queryClient.cancelQueries({ queryKey: ['product', id] });
 
       // Snapshot the previous value
       const previousProducts = queryClient.getQueryData<Product[]>(['products']);
@@ -150,6 +167,9 @@ export const useDeleteProduct = () => {
         );
       }
 
+      // Remove the specific product from cache as well
+      queryClient.removeQueries({ queryKey: ['product', id] });
+
       return { previousProducts };
     },
     onError: (err, id, context) => {
@@ -158,8 +178,15 @@ export const useDeleteProduct = () => {
         queryClient.setQueryData(['products'], context.previousProducts);
       }
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+    onSuccess: (data, id) => {
+      // On success, keep the product removed from cache
+      // Don't refetch - this ensures the product stays deleted in the UI
+      // Until the user manually refreshes the page or reopens the app
+      queryClient.setQueryData<Product[]>(['products'], (old) =>
+        old?.filter((product) => product.id !== id)
+      );
     },
+    // Removed onSettled to prevent automatic refetch
+    // This keeps the deleted product out of the UI until user refreshes
   });
 };

@@ -12,9 +12,10 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: true, // Auto-refresh on window focus
+      refetchOnWindowFocus: 'always', // Always refresh on window focus (not just when stale)
       retry: 2,
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 0, // Consider data stale immediately (ensures fresh data on focus)
+      gcTime: 1000 * 60 * 5, // Keep unused data in cache for 5 minutes (formerly cacheTime)
     },
   },
 });
