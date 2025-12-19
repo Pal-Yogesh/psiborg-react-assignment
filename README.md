@@ -193,8 +193,8 @@ The application uses the [Fake Store API](https://fakestoreapi.com/) for product
 ## 🔐 Authentication
 
 ### Default Credentials
-- **Username**: `test@example.com`
-- **Password**: `password123`
+- **Username**: `user`
+- **Password**: `password`
 
 The authentication is implemented using React Context API and persists across page refreshes using localStorage.
 
@@ -230,7 +230,7 @@ VITE_API_BASE_URL=https://fakestoreapi.com
 
 ## 🧪 Testing the Application
 
-1. **Login**: Use credentials `test@example.com` / `password123`
+1. **Login**
 2. **Browse Products**: Scroll through the paginated product list
 3. **Search**: Type in the search box to filter products
 4. **Filter**: Select a category from the dropdown
